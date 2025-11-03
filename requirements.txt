@@ -1,0 +1,11 @@
+streamlit
+torch
+torchvision
+Pillow
+numpy
+open_clip_torch
+faiss-cpu
+python-dotenv
+huggingface_hub
+transformers
+requests

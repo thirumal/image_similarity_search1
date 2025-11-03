@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+*.env.*
+
+# Virtual environment
+isvenvnew/
+venv/
+env/
+
+# Streamlit cache / logs
+.streamlit/
+
+# FAISS index & embeddings
+faiss_index/
+*.faiss
+*.npy
+
+# Images folder (optional if you don't want to push local images)
+images/
+
+# Models (if you download models locally)
+models/
+*.safetensors
+*.bin
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
+
