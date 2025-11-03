@@ -1,16 +1,18 @@
 import streamlit as st
 import os
 import zipfile
-import tempfile
 from PIL import Image
 import torch
 import numpy as np
 from transformers import CLIPProcessor, CLIPModel
 import faiss
 
-# --- Setup Directories ---
+# --- Setup Persistent Directories ---
+IMAGE_DIR = "./uploaded_images"
 FAISS_DIR = "./faiss_index"
+os.makedirs(IMAGE_DIR, exist_ok=True)
 os.makedirs(FAISS_DIR, exist_ok=True)
+
 INDEX_PATH = os.path.join(FAISS_DIR, "image_index.faiss")
 NAMES_PATH = os.path.join(FAISS_DIR, "image_names.npy")
 
@@ -56,7 +58,6 @@ def build_faiss_index(image_folder: str):
 
     embeddings = np.vstack(embeddings)
     dim = embeddings.shape[1]
-
     index = faiss.IndexFlatL2(dim)
     index.add(embeddings)
     faiss.write_index(index, INDEX_PATH)
@@ -75,45 +76,40 @@ def search_similar(query_emb, top_k=5):
     D, I = index.search(query_emb, top_k)
     return [(image_files[i], D[0][j]) for j, i in enumerate(I[0])]
 
-# --- UI ---
+# --- Streamlit UI ---
 st.title("🔍 Image & Text Similarity Search (CLIP + FAISS)")
+
+st.markdown("""
+Upload your image dataset (multiple files or a ZIP folder), 
+build embeddings with CLIP, and search similar images using text or image queries.
+""")
 
 # --- Upload Options ---
 upload_type = st.radio("Choose upload type:", ("Upload Multiple Images", "Upload ZIP File"))
 
-temp_dir = tempfile.mkdtemp()
-
 if upload_type == "Upload Multiple Images":
-    uploaded_images = st.file_uploader(
-        "📁 Upload multiple image files",
-        accept_multiple_files=True,
-        type=["jpg", "jpeg", "png"]
-    )
-
+    uploaded_images = st.file_uploader("📁 Upload multiple image files", accept_multiple_files=True, type=["jpg", "jpeg", "png"])
     if uploaded_images:
         for uploaded_file in uploaded_images:
-            img_path = os.path.join(temp_dir, uploaded_file.name)
+            img_path = os.path.join(IMAGE_DIR, uploaded_file.name)
             with open(img_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
         st.success(f"✅ {len(uploaded_images)} images uploaded successfully!")
-
         if st.button("🧠 Build Embedding Index"):
-            build_faiss_index(temp_dir)
+            build_faiss_index(IMAGE_DIR)
 
 elif upload_type == "Upload ZIP File":
     uploaded_zip = st.file_uploader("📦 Upload ZIP file containing images", type=["zip"])
     if uploaded_zip:
-        zip_path = os.path.join(temp_dir, "images.zip")
+        zip_path = os.path.join(IMAGE_DIR, "images.zip")
         with open(zip_path, "wb") as f:
             f.write(uploaded_zip.read())
-
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(temp_dir)
-
+            zip_ref.extractall(IMAGE_DIR)
+        os.remove(zip_path)
         st.success("✅ ZIP extracted successfully!")
-
         if st.button("🧠 Build Embedding Index"):
-            build_faiss_index(temp_dir)
+            build_faiss_index(IMAGE_DIR)
 
 # --- Query Section ---
 st.subheader("🔎 Search Using Text or Image")
@@ -135,14 +131,14 @@ elif query_type == "Image":
 
 # --- Search Results ---
 if query_emb is not None:
-    with st.spinner("Searching for similar images..."):
+    with st.spinner("🔍 Searching for similar images..."):
         results = search_similar(query_emb, top_k=5)
 
     if results:
         st.subheader("Top Similar Images:")
         cols = st.columns(5)
         for i, (img_name, dist) in enumerate(results):
-            img_path = os.path.join(temp_dir, img_name)
+            img_path = os.path.join(IMAGE_DIR, img_name)
             if os.path.exists(img_path):
                 with cols[i % 5]:
                     st.image(img_path, caption=f"{img_name}\n(dist={dist:.4f})", use_container_width=True)
